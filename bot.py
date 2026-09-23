@@ -76,5 +76,11 @@ async def delete_error(ctx, error):
         await ctx.send("❌ You do not have permission to use this command.", delete_after=5)
 
 # Paste your bot token from the Discord Developer Portal below
-import os
-bot.run("MTU1MjE1MjM0OTU5Njk3NTE2NA.GPuHgh.8wOfbw-GS0Wyy6gMXtW2QvNathdbAetV0V3B6U")
+token = os.environ.get("DISCORD_TOKEN")
+if token:
+    # Print just the length and first 5 characters to avoid exposing it fully
+    print(f"Token found! Length: {len(token)}, Starts with: {token[:5]}")
+else:
+    print("ERROR: DISCORD_TOKEN is empty or missing from environment variables!")
+
+bot.run(token)
