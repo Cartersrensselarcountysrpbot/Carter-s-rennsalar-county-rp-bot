@@ -1,86 +1,37 @@
 import os
+import threading
+from flask import Flask
 import discord
 from discord.ext import commands
 
-# Enable privileged intents (Required for member joins and message content)
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
+# 1. Initialize Flask Web Server for Render
+app = Flask(__name__)
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+@app.route('/')
+def home():
+    return "Bot is alive!"
 
-# Configuration: Update these with your server's details
-WELCOME_CHANNEL_ID = 1552134040285610079  # Replace with your actual Welcome Channel ID
-ALLOWED_ROLE_NAME = "Staff"             # Replace with the exact name of your moderator role
+def run_flask():
+    # Force port 10000 for Render health checks
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# 2. Start Flask on a background thread so it opens immediately
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
+
+# 3. Initialize Discord Bot
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
 
 @bot.event
 async def on_ready():
-    print(f"Bot logged in as {bot.user}")
+    print(f"Logged in as {bot.user.name}")
 
-# ----------------------------
-# 1. AUTO-WELCOME NEW MEMBERS
-# ----------------------------
-@bot.event
-async def on_member_join(member):
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
-    if channel:
-        embed = discord.Embed(
-            title=f"Welcome to the server, {member.name}! 🎉",
-            description=f"Hey {member.mention}, welcome to Rensselaer County Roleplay! Make sure to read the rules.",
-            color=discord.Color.blue()
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-        await channel.send(embed=embed)
-
-# ----------------------------
-# 2. CLEAR CHAT COMMAND (!clear <amount>)
-# ----------------------------
-@bot.command()
-@commands.has_role(ALLOWED_ROLE_NAME)
-async def clear(ctx, amount: int):
-    """Deletes a specified number of messages."""
-    if amount <= 0:
-        await ctx.send("Please specify a number greater than 0.", delete_after=5)
-        return
-    
-    # +1 to delete the command message itself
-    deleted = await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f"🧹 Cleared {len(deleted) - 1} messages.", delete_after=5)
-
-# Error handling if user lacks the required role
-@clear.error
-async def clear_error(ctx, error):
-    if isinstance(error, commands.MissingRole):
-        await ctx.send("❌ You do not have permission to use this command.", delete_after=5)
-
-# ----------------------------
-# 3. DELETE SPECIFIC MESSAGE (!delete <message_id>)
-# ----------------------------
-@bot.command()
-@commands.has_role(ALLOWED_ROLE_NAME)
-async def delete(ctx, message_id: int):
-    """Deletes a specific message by its ID."""
-    try:
-        msg = await ctx.channel.fetch_message(message_id)
-        await msg.delete()
-        await ctx.message.delete()  # Deletes the command trigger message
-        await ctx.send(f"✅ Deleted message `{message_id}`.", delete_after=5)
-    except discord.NotFound:
-        await ctx.send("❌ Message not found in this channel.", delete_after=5)
-    except discord.Forbidden:
-        await ctx.send("❌ I don't have permission to delete that message.", delete_after=5)
-
-@delete.error
-async def delete_error(ctx, error):
-    if isinstance(error, commands.MissingRole):
-        await ctx.send("❌ You do not have permission to use this command.", delete_after=5)
-
-# Paste your bot token from the Discord Developer Portal below
+# 4. Run Bot
 token = os.environ.get("DISCORD_TOKEN")
 if token:
-    # Print just the length and first 5 characters to avoid exposing it fully
-    print(f"Token found! Length: {len(token)}, Starts with: {token[:5]}")
+    print(f"Token found! Length: {len(token)}, Starting bot...")
+    bot.run(token)
 else:
-    print("ERROR: DISCORD_TOKEN is empty or missing from environment variables!")
-
-bot.run(token)
+    print("ERROR: DISCORD_TOKEN is missing!")
